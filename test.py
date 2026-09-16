@@ -1,1 +1,1 @@
-print("mini-infer pipeline test")gi
+print("mini-infer pipeline test")
