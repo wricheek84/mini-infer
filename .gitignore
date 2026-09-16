@@ -1,0 +1,16 @@
+# Python bytecode & caches
+__pycache__/
+*.pyc
+
+# Virtual environments
+venv/
+.env/
+
+# Model weights & large data
+checkpoints/
+*.safetensors
+*.bin
+
+# OS files
+.DS_Store
+Thumbs.db
