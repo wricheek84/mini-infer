@@ -12,12 +12,12 @@ print("loading model")
 tokenizer=AutoTokenizer.from_pretrained(model_id)
 model=AutoModelForCausalLM.from_pretrained(model_id,device_map="auto", torch_dtype=torch.float16, trust_remote_code=True)
 print("model loaded")
-def cold(model,tokenizer):
+def warmer(model,tokenizer):
     prompt=tokenizer("hello",return_tensors="pt").to(model.device)
     _=model.generate(**prompt,max_new_tokens=3)
     torch.cuda.reset_peak_memory_stats()
 print ("fixing cold start")
-cold(model,tokenizer)
+warmer(model,tokenizer)
 print("cold start fixed")
 def timed(prompt,max_tokens=100):
     inputs=tokenizer(prompt,return_tensors="pt").to(model.device)
@@ -35,25 +35,28 @@ def timed(prompt,max_tokens=100):
     t_submit=time.perf_counter()
     thread=threading.Thread(target=worker)
     thread.start()
-    ttft=0
+    ttft=None
     chunk=[]
     for ch in streamer:
-        if ttft==0:
+        if ttft is None:
             ttft=time.perf_counter()-t_submit
         chunk.append(ch)
     thread.join()
-    t_finish=time.perf_counter()
     torch.cuda.synchronize()
+    t_finish=time.perf_counter()
     gpu_time=start_time.elapsed_time(end_time)/1000
-    cpu_time=t_finish-t_submit
+    real_time=t_finish-t_submit
     output_length=container["output"].shape[-1]-input_length
     gen_tokens=output_length
+    client_thoroughput=gen_tokens/real_time if real_time>0 else 0
+    gpu_throughput=gen_tokens/gpu_time if gpu_time>0 else 0
+
     return {
         "text":"".join(chunk),
         "new_token_count":gen_tokens,
         "gpu_time":gpu_time,
-        "cpu_time":cpu_time,
-        "client_ttft":ttft if ttft>0 else cpu_time
+        "real_time":real_time,
+        "client_ttft":ttft
 
     }
 
