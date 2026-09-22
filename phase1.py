@@ -49,15 +49,34 @@ def timed(prompt,max_tokens=100):
     output_length=container["output"].shape[-1]-input_length
     gen_tokens=output_length
     client_thoroughput=gen_tokens/real_time if real_time>0 else 0
-    gpu_throughput=gen_tokens/gpu_time if gpu_time>0 else 0
+    gpu_tokens_per_sec=gen_tokens/gpu_time if gpu_time>0 else 0
 
     return {
         "text":"".join(chunk),
         "new_token_count":gen_tokens,
         "gpu_time":gpu_time,
         "real_time":real_time,
-        "client_ttft":ttft
+        "client_ttft":ttft,
+        "client_throughput":client_thoroughput,
+        "gpu_tokens_per_sec":gpu_tokens_per_sec
 
     }
+prompt_b = "Is the Earth round? Answer in one word: yes or no."
+
+print("\n--- Running Prompt B in isolation ---")
+torch.cuda.reset_peak_memory_stats()
+
+results_b_isolated = timed(prompt_b, max_tokens=15)
+peak_vram_mb = torch.cuda.max_memory_allocated() / (1024 ** 2)
+
+print("\nIsolated B Results:")
+print(f"Generated Text:       {results_b_isolated['text']!r}")
+print(f"Tokens Generated:     {results_b_isolated['new_token_count']}")
+print(f"Client TTFT:          {results_b_isolated['client_ttft']:.4f} s")
+print(f"Wall Time:            {results_b_isolated['real_time']:.4f} s")
+print(f"Pure GPU Time:        {results_b_isolated['gpu_time']:.4f} s")
+print(f"Client Throughput:    {results_b_isolated['client_throughput']:.2f} tok/s")
+print(f"GPU Tokens per Second:  {results_b_isolated['gpu_tokens_per_sec']:.2f} tok/s")
+print(f"Peak Allocated VRAM:  {peak_vram_mb:.2f} MB")
 
 
