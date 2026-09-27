@@ -1,0 +1,64 @@
+class Solution {
+public:
+    vector<string> parseTokens(const string& s) {
+        vector<string> tokens;
+        string cur = "";
+        int bal = 0;
+
+        for (char c : s) {
+            if (c == '(') bal++;
+            else if (c == ')') bal--;
+
+            if (c == ' ' && bal == 0) {
+                tokens.push_back(cur);
+                cur = "";
+            } else {
+                cur += c;
+            }
+        }
+        if (!cur.empty()) tokens.push_back(cur);
+        return tokens;
+    }
+
+    int getVar(const string& var, const vector<unordered_map<string, int>>& scopes) {
+        for (int i = (int)scopes.size() - 1; i >= 0; --i) {
+            if (scopes[i].count(var)) {
+                return scopes[i].at(var);
+            }
+        }
+        return 0;
+    }
+
+    int eval(const string& exp, vector<unordered_map<string, int>>& scopes) {
+        if (exp[0] != '(') {
+            if (isdigit(exp[0]) || exp[0] == '-') {
+                return stoi(exp);
+            }
+            return getVar(exp, scopes);
+        }
+
+        string inner = exp.substr(1, exp.size() - 2);
+        vector<string> tokens = parseTokens(inner);
+
+        if (tokens[0] == "add") {
+            return eval(tokens[1], scopes) + eval(tokens[2], scopes);
+        }
+        if (tokens[0] == "mult") {
+            return eval(tokens[1], scopes) * eval(tokens[2], scopes);
+        }
+
+        scopes.push_back({});
+        for (int i = 1; i < (int)tokens.size() - 1; i += 2) {
+            scopes.back()[tokens[i]] = eval(tokens[i + 1], scopes);
+        }
+
+        int res = eval(tokens.back(), scopes);
+        scopes.pop_back();
+        return res;
+    }
+
+    int evaluate(string expression) {
+        vector<unordered_map<string, int>> scopes;
+        return eval(expression, scopes);
+    }
+};
