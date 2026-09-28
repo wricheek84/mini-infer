@@ -116,7 +116,7 @@ peak_vram_mb = torch.cuda.max_memory_allocated() / (1024 ** 2)
 client_perceived_ttft_b = results_b['queue_wait'] + results_b['client_ttft']
 client_perceived_wall_b = results_b['queue_wait'] + results_b['real_time']
 
-print("\n--- Prompt A Results ---")
+print("Prompt A Results")
 print(f"Generated Text:          {results_a['text']!r}")
 print(f"Tokens Generated:        {results_a['new_token_count']}")
 print(f"Client TTFT:             {results_a['client_ttft']:.4f} s")
