@@ -70,7 +70,7 @@ results_b_isolated = timed(prompt_b, max_tokens=15)
 peak_vram_mb = torch.cuda.max_memory_allocated() / (1024 ** 2)
 
 print("\nIsolated B Results:")
-print(f"Generated Text:       {results_b_isolated['text']!r}")
+print(f"Generated Text:       {results_b_isolated['text']}")
 print(f"Tokens Generated:     {results_b_isolated['new_token_count']}")
 print(f"Client TTFT:          {results_b_isolated['client_ttft']:.4f} s")
 print(f"Wall Time:            {results_b_isolated['real_time']:.4f} s")
@@ -117,7 +117,7 @@ client_perceived_ttft_b = results_b['queue_wait'] + results_b['client_ttft']
 client_perceived_wall_b = results_b['queue_wait'] + results_b['real_time']
 
 print("Prompt A Results")
-print(f"Generated Text:          {results_a['text']!r}")
+print(f"Generated Text:          {results_a['text']}")
 print(f"Tokens Generated:        {results_a['new_token_count']}")
 print(f"Client TTFT:             {results_a['client_ttft']:.4f} s")
 print(f"Wall Time:               {results_a['real_time']:.4f} s")
@@ -126,7 +126,7 @@ print(f"Client Throughput:       {results_a['client_throughput']:.2f} tok/s")
 print(f"GPU Tokens per Second:   {results_a['gpu_tokens_per_sec']:.2f} tok/s")
 
 print("Prompt B Results due to head of line blocking:")
-print(f"Generated Text:          {results_b['text']!r}")
+print(f"Generated Text:          {results_b['text']}")
 print(f"Tokens Generated:        {results_b['new_token_count']}")
 print(f"Queue Wait Time:         {results_b['queue_wait']:.4f} s")
 print(f"Pure Generation TTFT:    {results_b['client_ttft']:.4f} s")
