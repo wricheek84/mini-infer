@@ -19,7 +19,7 @@ def warmer(model,tokenizer):
 print ("fixing cold start")
 warmer(model,tokenizer)
 print("cold start fixed")
-def timed(prompt,max_tokens=100):
+def timed(prompt,max_tokens=1000):
     inputs=tokenizer(prompt,return_tensors="pt").to(model.device)
     input_length=inputs.input_ids.shape[-1]
     streamer=TextIteratorStreamer(tokenizer,skip_prompt=True,skip_special_tokens=True)
@@ -79,4 +79,62 @@ print(f"Client Throughput:    {results_b_isolated['client_throughput']:.2f} tok/
 print(f"GPU Tokens per Second:  {results_b_isolated['gpu_tokens_per_sec']:.2f} tok/s")
 print(f"Peak Allocated VRAM:  {peak_vram_mb:.2f} MB")
 
+## demonstrating head of line blocking
+prompt_a = "tell me about the city of haldia in west bengal,india"
+lock = threading.Lock()
+event = threading.Event()
+results_a = {}
+results_b = {}
 
+def run_prompt_a():
+    lock.acquire()
+    event.set()
+    results_a.update(timed(prompt_a, max_tokens=256))
+    lock.release()
+
+def run_prompt_b():
+    event.wait()
+    b_arrival_time = time.perf_counter()
+    lock.acquire()
+    b_start_time = time.perf_counter()
+    results_b.update(timed(prompt_b, max_tokens=15))
+    lock.release()
+    results_b['queue_wait'] = b_start_time - b_arrival_time
+
+torch.cuda.reset_peak_memory_stats()
+thread_a = threading.Thread(target=run_prompt_a)
+thread_b = threading.Thread(target=run_prompt_b)
+
+thread_a.start()
+thread_b.start()
+
+thread_a.join()
+thread_b.join()
+
+peak_vram_mb = torch.cuda.max_memory_allocated() / (1024 ** 2)
+
+client_perceived_ttft_b = results_b['queue_wait'] + results_b['client_ttft']
+client_perceived_wall_b = results_b['queue_wait'] + results_b['real_time']
+
+print("\n--- Prompt A Results ---")
+print(f"Generated Text:          {results_a['text']!r}")
+print(f"Tokens Generated:        {results_a['new_token_count']}")
+print(f"Client TTFT:             {results_a['client_ttft']:.4f} s")
+print(f"Wall Time:               {results_a['real_time']:.4f} s")
+print(f"Pure GPU Time:           {results_a['gpu_time']:.4f} s")
+print(f"Client Throughput:       {results_a['client_throughput']:.2f} tok/s")
+print(f"GPU Tokens per Second:   {results_a['gpu_tokens_per_sec']:.2f} tok/s")
+
+print("Prompt B Results due to head of line blocking:")
+print(f"Generated Text:          {results_b['text']!r}")
+print(f"Tokens Generated:        {results_b['new_token_count']}")
+print(f"Queue Wait Time:         {results_b['queue_wait']:.4f} s")
+print(f"Pure Generation TTFT:    {results_b['client_ttft']:.4f} s")
+print(f"True Client TTFT:        {client_perceived_ttft_b:.4f} s")
+print(f"Pure Generation Wall:    {results_b['real_time']:.4f} s")
+print(f"True Client Wall Time:   {client_perceived_wall_b:.4f} s")
+print(f"Pure GPU Time:           {results_b['gpu_time']:.4f} s")
+print(f"Client Throughput:       {results_b['client_throughput']:.2f} tok/s")
+print(f"GPU Tokens per Second:   {results_b['gpu_tokens_per_sec']:.2f} tok/s")
+
+print(f"\nPeak Allocated VRAM:     {peak_vram_mb:.2f} MB")
