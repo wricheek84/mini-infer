@@ -63,7 +63,7 @@ def timed(prompt,max_tokens=100):
     }
 prompt_b = "Is the Earth round? Answer in one word: yes or no."
 
-print("\n--- Running Prompt B in isolation ---")
+print("Running Prompt B in isolation")
 torch.cuda.reset_peak_memory_stats()
 
 results_b_isolated = timed(prompt_b, max_tokens=15)
