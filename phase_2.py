@@ -18,7 +18,7 @@ class request:
     req_id:str
     prompt:str
     max_tokens:int
-    intput_id:torch.Tensor
+    input_id:torch.Tensor
     generated_token_ids:List[int]=field(default_factory=list)
     past_kv:Any=None
     is_prefill:bool=False
@@ -28,7 +28,7 @@ class request:
     ttft:Optional[float]=None
     finish_time:Optional[float]=None
 
-def prefill(req:request)->none:
+def prefill(req:request)->None:
     if req.start_time is None:
         req.start_time = time.perf_counter()
     with torch.inference_mode():
@@ -58,6 +58,71 @@ def decode(req:request)->None:
         req.is_finished=True
         req.finish_time=time.perf_counter()
 
+def run_continous_batching(req_to_run: List[request]) -> List[request]:
+    waiting_queue: List[request] = list(req_to_run)
+    active_batch: List[request] = []
+    finished_requests: List[request] = []
 
+    while waiting_queue or active_batch:
+        while waiting_queue:
+            req = waiting_queue.pop(0)
+            prefill(req)
 
-    
+            if req.is_finished:
+                finished_requests.append(req)
+            else:
+                active_batch.append(req)
+
+        for req in active_batch:
+            decode(req)
+
+        remaining_active_batch = [req for req in active_batch if not req.is_finished]
+
+        for req in active_batch:
+            if req.is_finished:
+                finished_requests.append(req)
+
+        active_batch = remaining_active_batch
+
+    return finished_requests
+
+prompt_a_text = "Explain the history of Kolkata in detail, including its cultural and economic growth:"
+prompt_b_text = "What is the capital of France? Answer in one word:"
+
+input_ids_a = tokenizer(prompt_a_text, return_tensors="pt").input_ids.to(model.device)
+input_ids_b = tokenizer(prompt_b_text, return_tensors="pt").input_ids.to(model.device)
+
+req_a = request(
+    req_id="Req-A (Long)",
+    prompt=prompt_a_text,
+    max_tokens=256,
+    input_ids=input_ids_a
+)
+
+req_b = request(
+    req_id="Req-B (Short)",
+    prompt=prompt_b_text,
+    max_tokens=15,
+    input_ids=input_ids_b
+)
+
+print(" Starting Continuous Batching Engine ")
+
+benchmark_start = time.perf_counter()
+completed_requests = run_continous_batching([req_a, req_b])
+benchmark_total = time.perf_counter() - benchmark_start
+
+print(f" All Requests Finished in {benchmark_total:.2f}s")
+
+for req in completed_requests:
+    output_text = tokenizer.decode(
+        req.generated_token_ids,
+        skip_special_tokens=True
+    )
+    total_latency = req.finish_time - req.arrival_time
+
+    print(f"[{req.req_id}]")
+    print(f"  Tokens Produced: {len(req.generated_token_ids)}")
+    print(f"  TTFT:            {req.ttft:.4f}s")
+    print(f"  Total Latency:   {total_latency:.2f}s")
+    print(f"  Output Preview:  {output_text.strip()[:80]}\n")
