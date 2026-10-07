@@ -15,6 +15,7 @@ login(token=hf_token)
 model_name = "meta-llama/Llama-3.2-1B-Instruct"
 
 tokenizer = AutoTokenizer.from_pretrained(model_name)
+stop_token_ids = {tokenizer.eos_token_id, tokenizer.convert_tokens_to_ids("<|eot_id|>")}
 
 model = AutoModelForCausalLM.from_pretrained(
     model_name,
@@ -34,17 +35,20 @@ class request:
     input_ids: torch.Tensor
     generated_token_ids: List[int] = field(default_factory=list)
     past_kv: Any = None
-    is_prefill: bool = False
     is_finished: bool = False
-    arrival_time: float = field(default_factory=time.perf_counter)
+    arrival_time: Optional[float] = None
     start_time: Optional[float] = None
     ttft: Optional[float] = None
     finish_time: Optional[float] = None
 
 
 def prefill(req: request) -> None:
+    now=time.perf_counter()
+    if req.arrival_time is None:
+        req.arrival_time = now
     if req.start_time is None:
-        req.start_time = time.perf_counter()
+        req.start_time = now
+
 
     with torch.inference_mode():
         outputs = model(
@@ -59,13 +63,9 @@ def prefill(req: request) -> None:
 
     req.generated_token_ids.append(next_token_id)
     req.past_kv = outputs.past_key_values
-    req.is_prefill = True
     req.ttft = time.perf_counter() - req.arrival_time
 
-    if (
-        next_token_id == tokenizer.eos_token_id
-        or len(req.generated_token_ids) >= req.max_tokens
-    ):
+    if next_token_id in stop_token_ids or len(req.generated_token_ids) >= req.max_tokens:
         req.is_finished = True
         req.finish_time = time.perf_counter()
 
@@ -96,42 +96,40 @@ def decode(req: request) -> None:
     req.generated_token_ids.append(next_token_id)
 
     if (
-        next_token_id == tokenizer.eos_token_id
+        next_token_id in stop_token_ids
         or len(req.generated_token_ids) >= req.max_tokens
     ):
         req.is_finished = True
         req.finish_time = time.perf_counter()
 
 
-def run_continuous_batching(
-    req_to_run: List[request]
-) -> List[request]:
+def run_continuous_batching(req_to_run: List[request]) -> List[request]:
     waiting_queue = list(req_to_run)
     active_batch = []
     finished_requests = []
 
     while waiting_queue or active_batch:
+       
+        for req in active_batch:
+            decode(req)
+
+     
+        surviving_batch = []
+        for req in active_batch:
+            if req.is_finished:
+                finished_requests.append(req)
+            else:
+                surviving_batch.append(req)
+        active_batch = surviving_batch
+
+        
         while waiting_queue:
             req = waiting_queue.pop(0)
             prefill(req)
-
             if req.is_finished:
                 finished_requests.append(req)
             else:
                 active_batch.append(req)
-
-        for req in active_batch:
-            decode(req)
-
-        remaining_active_batch = []
-
-        for req in active_batch:
-            if req.is_finished:
-                finished_requests.append(req)
-            else:
-                remaining_active_batch.append(req)
-
-        active_batch = remaining_active_batch
 
     return finished_requests
 
