@@ -43,11 +43,9 @@ class request:
 
 
 def prefill(req: request) -> None:
-    now=time.perf_counter()
-    if req.arrival_time is None:
-        req.arrival_time = now
+    
     if req.start_time is None:
-        req.start_time = now
+        req.start_time = time.perf_counter()
 
 
     with torch.inference_mode():
@@ -104,6 +102,9 @@ def decode(req: request) -> None:
 
 
 def run_continuous_batching(req_to_run: List[request]) -> List[request]:
+    for req in req_to_run:
+        if req.arrival_time is None:
+            req.arrival_time = time.perf_counter()
     waiting_queue = list(req_to_run)
     active_batch = []
     finished_requests = []
@@ -153,7 +154,7 @@ def warmer():
     torch.cuda.reset_peak_memory_stats()
 
 
-print("Warming up GPU...")
+print("cold start")
 warmer()
 print("GPU warm-up complete.")
 
