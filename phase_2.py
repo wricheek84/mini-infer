@@ -212,6 +212,6 @@ for req in completed_requests:
     print(f"Tokens Produced: {len(req.generated_token_ids)}")
     print(f"TTFT: {req.ttft:.4f}s")
     print(f"Total Latency: {total_latency:.2f}s")
-    print(f"Output Preview: {output_text.strip()[:80]}...\n")
+    print(f"Generated Output:\n{output_text.strip()}\n")
 
 print(f"Peak Allocated VRAM: {peak_vram_mb:.2f} MB")
