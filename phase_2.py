@@ -145,7 +145,8 @@ def warmer():
         req_id="warmer",
         prompt="hello",
         max_tokens=2,
-        input_ids=dummy_input
+        input_ids=dummy_input,
+        arrival_time=time.perf_counter()
     )
 
     prefill(dummy_req)
