@@ -50,13 +50,13 @@ def prefill(req: request) -> None:
     ).item()
     req.generated_token_ids.append(next_token_id)
     req.past_kv = outputs.past_key_values
-    req.ttft = time.perf_counter() - req.start_time
+    req.ttft = time.perf_counter() - req.arrival_time
     if next_token_id in stop_token_ids or len(req.generated_token_ids) >= req.max_tokens:
         req.is_finished = True
         req.finish_time = time.perf_counter()
 
 def decode(req: request) ->None:
-    if req.is_finihed:
+    if req.is_finished:
         return
     last_token_id = req.generated_token_ids[-1]
     input_tensor = torch.tensor([[last_token_id]], device=model.device)
@@ -82,9 +82,10 @@ def decode(req: request) ->None:
 def run_continuous_decoding(req_to_run: List[request]) -> List[request]:
 
     incoming_requests =list(req_to_run)
-    waiting_queue= List[request]=[]
-    active_requests= List[request]=[]
-    finished_requests= List[request]=[]
+    waiting_queue = []
+    active_requests = []
+    finished_requests = []
+   
 
     curr_count=0
     while incoming_requests or waiting_queue or active_requests:
@@ -95,7 +96,7 @@ def run_continuous_decoding(req_to_run: List[request]) -> List[request]:
                 waiting_queue.append(req)
             else:
                 curr_incoming.append(req)
-            incoming_requests=curr_incoming
+        incoming_requests=curr_incoming
 
         for req in active_requests:
             decode(req)
@@ -158,13 +159,13 @@ req_b = request(
     prompt=prompt_b,
     max_tokens=128,
     input_ids=input_ids_b,
-    arrival_tick=0
+    arrival_tick=100
 )
 
 
 print("Starting continuous batching with staggered arrivals...")
 print("-> Req-A scheduled for Tick 0")
-print("-> Req-B scheduled for Tick 30 for staggerred arrival simulation")
+print("-> Req-B scheduled for Tick 100 for staggerred arrival simulation")
 torch.cuda.reset_peak_memory_stats()
 benchmark_start = time.perf_counter()
 
